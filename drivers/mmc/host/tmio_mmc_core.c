@@ -211,14 +211,20 @@ static void tmio_mmc_reset(struct tmio_mmc_host *host)
 {
 	/* FIXME - should we set stop clock reg here */
 	sd_ctrl_write16(host, CTL_RESET_SD, 0x0000);
-	usleep_range(10000, 11000);
+	if (in_interrupt())
+		mdelay(11);
+	else
+		usleep_range(10000, 11000);
 	sd_ctrl_write16(host, CTL_RESET_SD, 0x0001);
-	usleep_range(10000, 11000);
+	if (in_interrupt())
+		mdelay(11);
+	else
+		usleep_range(10000, 11000);
 
 	tmio_mmc_abort_dma(host);
 
-	if (host->reset)
-		host->reset(host);
+	if (host->ops.hw_reset)
+		host->ops.hw_reset(host->mmc);
 
 	sd_ctrl_write32_as_16_and_16(host, CTL_IRQ_MASK, host->sdcard_irq_mask_all);
 	host->sdcard_irq_mask = host->sdcard_irq_mask_all;
@@ -878,6 +884,14 @@ static void tmio_mmc_finish_request(struct tmio_mmc_host *host)
 	spin_unlock_irqrestore(&host->lock, flags);
 
 	if (mrq->cmd->error || (mrq->data && mrq->data->error)) {
+		/*
+		 * Set clock if mmc_request data is error. This is one of
+		 * additional steps to be executed if an error is detected
+		 * in the renesas_sdhi_internal_dmac_complete() function.
+		 */
+		if (mrq->data)
+			host->set_clock(host, host->mmc->ios.clock);
+
 		tmio_mmc_ack_mmc_irqs(host, TMIO_MASK_IRQ); /* Clear all */
 		tmio_mmc_abort_dma(host);
 	}
@@ -1013,7 +1027,7 @@ static void tmio_mmc_set_ios(struct mmc_host *mmc, struct mmc_ios *ios)
 		tmio_mmc_power_off(host);
 		/* For R-Car Gen2+, we need to reset SDHI specific SCC */
 		if (host->pdata->flags & TMIO_MMC_MIN_RCAR2)
-			host->reset(host);
+			host->ops.hw_reset(mmc);
 		host->set_clock(host, 0);
 		break;
 	case MMC_POWER_UP:
@@ -1248,6 +1262,7 @@ int tmio_mmc_host_probe(struct tmio_mmc_host *_host)
 		_host->sdcard_irq_mask_all = TMIO_MASK_ALL;
 
 	_host->set_clock(_host, 0);
+	_host->reset = tmio_mmc_reset;
 	tmio_mmc_reset(_host);
 
 	if (_host->native_hotplug)
