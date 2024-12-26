@@ -46,11 +46,14 @@ properties:
               - renesas,vin-r8a7779  # R-Car H1
               - renesas,vin-r8a7795  # R-Car H3
               - renesas,vin-r8a7796  # R-Car M3-W
+              - renesas,vin-r8a77961 # R-Car M3-W+
               - renesas,vin-r8a77965 # R-Car M3-N
               - renesas,vin-r8a77970 # R-Car V3M
               - renesas,vin-r8a77980 # R-Car V3H
               - renesas,vin-r8a77990 # R-Car E3
               - renesas,vin-r8a77995 # R-Car D3
+              - renesas,vin-r8a779a0 # R-Car V3U
+              - renesas,vin-r8a779g0 # R-Car V4U
 
   reg:
     maxItems: 1
